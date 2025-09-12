@@ -1,0 +1,17 @@
+{
+  "name": "websim-build-bridge",
+  "version": "1.0.0",
+  "description": "Node.js bridge for building WebSim projects",
+  "main": "bridge.js",
+  "scripts": {
+    "start": "node bridge.js"
+  },
+  "dependencies": {
+    "ws": "^8.13.0",
+    "archiver": "^5.3.1"
+  },
+  "devDependencies": {
+    "nativefier": "^50.0.0"
+  }
+}
+

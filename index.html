@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSim Project Packager</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Cal+Sans:wght@400;600&family=Noto+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div id="app">
+        <header class="header">
+            <div class="header-content">
+                <h1 class="title">WebSim Project Packager</h1>
+                <div class="connection-status" id="connectionStatus">
+                    <div class="status-indicator"></div>
+                    <span>Connecting...</span>
+                </div>
+            </div>
+        </header>
+
+        <main class="main-content">
+            <!-- Creator Interface -->
+            <div id="creatorInterface" class="interface creator-interface" style="display: none;">
+                <div class="creator-panel">
+                    <h2>Creator Dashboard</h2>
+                    <div class="bridge-status" id="bridgeStatus">
+                        <div class="status-card">
+                            <h3>Node.js Bridge Status</h3>
+                            <div class="status-indicator" id="bridgeIndicator"></div>
+                            <span id="bridgeStatusText">Disconnected</span>
+                        </div>
+                        <div class="instructions">
+                            <h4>To start the bridge:</h4>
+                            <code>node bridge.js</code>
+                        </div>
+                    </div>
+
+                    <div class="build-queue" id="buildQueue">
+                        <h3>Build Queue</h3>
+                        <div class="queue-list" id="queueList">
+                            <div class="empty-state">No pending builds</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="connected-users">
+                    <h3>Connected Users</h3>
+                    <div id="usersList" class="users-list"></div>
+                </div>
+            </div>
+
+            <!-- User Interface -->
+            <div id="userInterface" class="interface user-interface" style="display: none;">
+                <div class="projects-section">
+                    <h2>Available Projects</h2>
+                    <div class="creator-info" id="creatorInfo"></div>
+                    <div class="projects-grid" id="projectsGrid">
+                        <div class="loading">Loading projects...</div>
+                    </div>
+                </div>
+
+                <div class="build-section" id="buildSection" style="display: none;">
+                    <h3>Build Configuration</h3>
+                    <div class="selected-project" id="selectedProject"></div>
+                    
+                    <div class="platform-selection">
+                        <h4>Target Platform</h4>
+                        <div class="platform-options">
+                            <label class="platform-option">
+                                <input type="radio" name="platform" value="windows" checked>
+                                <span class="platform-icon">🪟</span>
+                                <span>Windows</span>
+                            </label>
+                            <label class="platform-option">
+                                <input type="radio" name="platform" value="darwin">
+                                <span class="platform-icon">🍎</span>
+                                <span>macOS</span>
+                            </label>
+                            <label class="platform-option">
+                                <input type="radio" name="platform" value="linux">
+                                <span class="platform-icon">🐧</span>
+                                <span>Linux</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <button id="buildButton" class="build-button">
+                        Request Build
+                    </button>
+
+                    <div class="build-status" id="buildStatus" style="display: none;">
+                        <div class="status-message" id="statusMessage"></div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="progressFill"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Loading State -->
+            <div id="loadingState" class="loading-state">
+                <div class="spinner"></div>
+                <p>Initializing connection...</p>
+            </div>
+        </main>
+    </div>
+
+    <script type="module" src="app.js"></script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"4c6229722a6346bc8eb5cb0e5eae5d41","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+</body>
+</html>
+
