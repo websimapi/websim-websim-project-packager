@@ -649,6 +649,7 @@ class BuildBridge {
             error
         }));
     }
+}
 
     getPackageJsonContent() {
         return `{
