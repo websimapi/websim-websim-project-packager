@@ -491,16 +491,42 @@ const { exec } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const archiver = require('archiver');
+const http = require('http');
 
 class BuildBridge {
     constructor() {
-        this.server = new WebSocket.Server({ port: 8080 });
-        this.setupServer();
+        this.wsServer = new WebSocket.Server({ port: 8080 });
+        this.setupWebSocketServer();
         console.log('Build bridge listening on ws://localhost:8080');
+
+        this.fileServer = http.createServer((req, res) => {
+            if (req.url.startsWith('/download/')) {
+                const fileName = req.url.substring('/download/'.length);
+                const filePath = path.join(__dirname, 'builds', fileName);
+
+                if (fs.existsSync(filePath)) {
+                    res.writeHead(200, {
+                        'Content-Type': 'application/zip',
+                        'Content-Disposition': \`attachment; filename="\${fileName}"\`,
+                    });
+                    fs.createReadStream(filePath).pipe(res);
+                } else {
+                    res.writeHead(404, { 'Content-Type': 'text/plain' });
+                    res.end('File not found');
+                }
+            } else {
+                res.writeHead(404, { 'Content-Type': 'text/plain' });
+                res.end('Not Found');
+            }
+        });
+        
+        this.fileServer.listen(8081, () => {
+            console.log('File server running on http://localhost:8081');
+        });
     }
 
-    setupServer() {
-        this.server.on('connection', (ws) => {
+    setupWebSocketServer() {
+        this.wsServer.on('connection', (ws) => {
             console.log('WebSim client connected');
 
             ws.on('message', (message) => {
@@ -519,16 +545,15 @@ class BuildBridge {
     }
 
     async handleMessage(ws, data) {
-        switch (data.type) {
-            case 'build':
-                await this.handleBuild(ws, data);
-                break;
+        if (data.type === 'build') {
+            await this.handleBuild(ws, data);
         }
     }
 
     async handleBuild(ws, { url, platform, projectName, requestId }) {
         const outputDir = path.join(__dirname, 'builds', requestId);
-        const zipPath = path.join(__dirname, 'builds', \`\${projectName}-\${platform}.zip\`);
+        const zipFileName = \`\${projectName}-\${platform}.zip\`;
+        const zipPath = path.join(__dirname, 'builds', zipFileName);
 
         try {
             if (!fs.existsSync(path.join(__dirname, 'builds'))) {
@@ -537,7 +562,7 @@ class BuildBridge {
 
             this.sendProgress(ws, requestId, 'Preparing build environment...', 30);
 
-            const arch = platform === 'darwin' ? 'x64' : 'x64';
+            const arch = 'x64';
             const command = \`npx nativefier "\${url}" --name "\${projectName}" --platform "\${platform}" --arch "\${arch}" --out "\${outputDir}" --overwrite\`;
 
             console.log('Running command:', command);
@@ -546,51 +571,38 @@ class BuildBridge {
 
             exec(command, { timeout: 300000 }, async (error, stdout, stderr) => {
                 if (error) {
-                    console.error('Build error:', error);
+                    console.error('Build error:', stderr || stdout || error);
                     this.sendError(ws, requestId, \`Build failed: \${error.message}\`);
                     return;
                 }
 
                 try {
                     this.sendProgress(ws, requestId, 'Compressing application...', 80);
-
-                    const builtAppDir = this.findBuiltApp(outputDir, projectName);
-                    if (!builtAppDir) {
-                        throw new Error('Built application not found');
+                    
+                    const appDirName = fs.readdirSync(outputDir).find(file => fs.statSync(path.join(outputDir, file)).isDirectory());
+                    if (!appDirName) {
+                        throw new Error('Could not find built application directory.');
                     }
+                    const builtAppDir = path.join(outputDir, appDirName);
 
                     await this.createZip(builtAppDir, zipPath);
-                    this.sendProgress(ws, requestId, 'Upload complete!', 100);
-
-                    const downloadUrl = await this.uploadFile(zipPath);
+                    
+                    const downloadUrl = \`http://localhost:8081/download/\${zipFileName}\`;
                     this.sendComplete(ws, requestId, downloadUrl);
-                    this.cleanup(outputDir, zipPath);
+                    this.sendProgress(ws, requestId, 'Build complete!', 100);
+
+                    // Note: Cleanup is handled by the bridge itself after a delay.
 
                 } catch (zipError) {
-                    console.error('Compression error:', zipError);
-                    this.sendError(ws, requestId, \`Compression failed: \${zipError.message}\`);
+                    console.error('Compression/Packaging error:', zipError);
+                    this.sendError(ws, requestId, \`Packaging failed: \${zipError.message}\`);
                 }
             });
 
-        } catch (error) {
-            console.error('Build setup error:', error);
-            this.sendError(ws, requestId, \`Build setup failed: \${error.message}\`);
+        } catch (setupError) {
+            console.error('Build setup error:', setupError);
+            this.sendError(ws, requestId, \`Build setup failed: \${setupError.message}\`);
         }
-    }
-
-    findBuiltApp(outputDir, projectName) {
-        try {
-            const files = fs.readdirSync(outputDir);
-            for (const file of files) {
-                const filePath = path.join(outputDir, file);
-                if (fs.statSync(filePath).isDirectory()) {
-                    return filePath;
-                }
-            }
-        } catch (error) {
-            console.error('Error finding built app:', error);
-        }
-        return null;
     }
 
     createZip(sourceDir, outputPath) {
@@ -602,10 +614,8 @@ class BuildBridge {
                 console.log(\`ZIP created: \${archive.pointer()} total bytes\`);
                 resolve();
             });
-
-            archive.on('error', (err) => {
-                reject(err);
-            });
+            output.on('error', (err) => reject(err));
+            archive.on('error', (err) => reject(err));
 
             archive.pipe(output);
             archive.directory(sourceDir, false);
@@ -613,55 +623,16 @@ class BuildBridge {
         });
     }
 
-    async uploadFile(filePath) {
-        try {
-            const fileBuffer = fs.readFileSync(filePath);
-            const file = new File([fileBuffer], path.basename(filePath), { type: 'application/zip' });
-            return \`http://localhost:8080/download/\${path.basename(filePath)}\`;
-        } catch (error) {
-            throw new Error(\`Upload failed: \${error.message}\`);
-        }
-    }
-
-    cleanup(outputDir, zipPath) {
-        try {
-            if (fs.existsSync(outputDir)) {
-                fs.rmSync(outputDir, { recursive: true, force: true });
-            }
-            
-            setTimeout(() => {
-                if (fs.existsSync(zipPath)) {
-                    fs.unlinkSync(zipPath);
-                }
-            }, 3600000);
-        } catch (error) {
-            console.error('Cleanup error:', error);
-        }
-    }
-
     sendProgress(ws, requestId, message, progress) {
-        ws.send(JSON.stringify({
-            type: 'build_progress',
-            requestId,
-            message,
-            progress
-        }));
+        ws.send(JSON.stringify({ type: 'build_progress', requestId, message, progress }));
     }
 
     sendComplete(ws, requestId, downloadUrl) {
-        ws.send(JSON.stringify({
-            type: 'build_complete',
-            requestId,
-            downloadUrl
-        }));
+        ws.send(JSON.stringify({ type: 'build_complete', requestId, downloadUrl }));
     }
 
     sendError(ws, requestId, error) {
-        ws.send(JSON.stringify({
-            type: 'build_error',
-            requestId,
-            error
-        }));
+        ws.send(JSON.stringify({ type: 'build_error', requestId, error }));
     }
 }
 
