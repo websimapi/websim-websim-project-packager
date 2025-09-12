@@ -705,9 +705,10 @@ Once running, the bridge will:
 `;
     }
 
-    createAndDownloadZip(files, filename) {
-        // Use JSZip to create zip in browser
-        import('https://esm.sh/jszip').then(({ default: JSZip }) => {
+    async createAndDownloadZip(files, filename) {
+        try {
+            // Use JSZip to create zip in browser
+            const { default: JSZip } = await import('jszip');
             const zip = new JSZip();
             
             // Add each file to the zip
@@ -716,17 +717,19 @@ Once running, the bridge will:
             });
             
             // Generate and download
-            zip.generateAsync({ type: 'blob' }).then((blob) => {
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = filename;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
-            });
-        });
+            const blob = await zip.generateAsync({ type: 'blob' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        } catch (error) {
+            console.error("Failed to create ZIP file:", error);
+            alert("Could not create the download file. Please check the console for errors.");
+        }
     }
 }
 
