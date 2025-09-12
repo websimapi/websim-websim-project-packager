@@ -67,8 +67,9 @@ class ProjectPackager {
             this.requestBuild();
         });
 
-        document.getElementById('downloadBridgeButton')?.addEventListener('click', () => {
-            this.downloadBridge();
+        // Bridge download handler
+        document.getElementById('downloadBridge')?.addEventListener('click', () => {
+            this.downloadBridgePackage();
         });
 
         // Project selection
@@ -460,19 +461,32 @@ class ProjectPackager {
         // Handle presence update requests if needed
     }
 
-    downloadBridge() {
-        // Create the bridge files as a downloadable zip
-        const bridgeFiles = {
-            'bridge.js': this.getBridgeFileContent(),
-            'package.json': this.getPackageJsonContent(),
-            'README.md': this.getReadmeContent()
+    downloadBridgePackage() {
+        // Create the bridge files as a ZIP
+        const zip = new JSZip();
+        
+        // Add package.json
+        const packageJson = {
+            "name": "websim-build-bridge",
+            "version": "1.0.0",
+            "description": "Node.js bridge for building WebSim projects",
+            "main": "bridge.js",
+            "scripts": {
+                "start": "node bridge.js"
+            },
+            "dependencies": {
+                "ws": "^8.13.0",
+                "archiver": "^5.3.1"
+            },
+            "devDependencies": {
+                "nativefier": "^50.0.0"
+            }
         };
-
-        this.createAndDownloadZip(bridgeFiles, 'websim-bridge.zip');
-    }
-
-    getBridgeFileContent() {
-        return `const WebSocket = require('ws');
+        
+        zip.file("package.json", JSON.stringify(packageJson, null, 2));
+        
+        // Add bridge.js
+        const bridgeJs = `const WebSocket = require('ws');
 const { exec } = require('child_process');
 const fs = require('fs');
 const path = require('path');
@@ -651,86 +665,7 @@ class BuildBridge {
     }
 }
 
-    getPackageJsonContent() {
-        return `{
-  "name": "websim-build-bridge",
-  "version": "1.0.0",
-  "description": "Node.js bridge for building WebSim projects",
-  "main": "bridge.js",
-  "scripts": {
-    "start": "node bridge.js"
-  },
-  "dependencies": {
-    "ws": "^8.13.0",
-    "archiver": "^5.3.1"
-  },
-  "devDependencies": {
-    "nativefier": "^50.0.0"
-  }
-}`;
-    }
-
-    getReadmeContent() {
-        return `# WebSim Build Bridge
-
-This bridge enables packaging WebSim projects as desktop applications.
-
-## Setup
-
-1. Install Node.js (https://nodejs.org)
-2. Extract this ZIP file to a folder
-3. Open terminal/command prompt in that folder
-4. Run: \`npm install\`
-5. Run: \`npm start\`
-
-## Usage
-
-Once running, the bridge will:
-- Listen on ws://localhost:8080
-- Accept build requests from WebSim
-- Package projects using Nativefier
-- Return downloadable applications
-
-## Requirements
-
-- Node.js 16+
-- Internet connection for downloading dependencies
-- Sufficient disk space for temporary builds
-
-## Troubleshooting
-
-- Ensure port 8080 is available
-- Check firewall settings
-- Make sure you have write permissions in the bridge folder
-`;
-    }
-
-    async createAndDownloadZip(files, filename) {
-        try {
-            // Use JSZip to create zip in browser
-            const { default: JSZip } = await import('jszip');
-            const zip = new JSZip();
-            
-            // Add each file to the zip
-            Object.entries(files).forEach(([filename, content]) => {
-                zip.file(filename, content);
-            });
-            
-            // Generate and download
-            const blob = await zip.generateAsync({ type: 'blob' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = filename;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-        } catch (error) {
-            console.error("Failed to create ZIP file:", error);
-            alert("Could not create the download file. Please check the console for errors.");
-        }
-    }
+new BuildBridge();
 }
 
 // Initialize the app when DOM is loaded

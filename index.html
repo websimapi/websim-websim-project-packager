@@ -24,28 +24,22 @@
             <div id="creatorInterface" class="interface creator-interface" style="display: none;">
                 <div class="creator-panel">
                     <h2>Creator Dashboard</h2>
-                    
-                    <div class="bridge-download" style="margin-bottom: 2rem;">
-                        <div class="status-card">
-                            <h3>Download Node.js Bridge</h3>
-                            <p style="margin-bottom: 1rem; color: #6b7280; font-size: 0.9rem;">
-                                Download the bridge files to run locally and enable project packaging.
-                            </p>
-                            <button id="downloadBridgeButton" class="build-button" style="margin-top: 0; font-size: 0.9rem; padding: 0.75rem 1.5rem;">
-                                📦 Download Bridge Files
-                            </button>
-                        </div>
-                    </div>
-
                     <div class="bridge-status" id="bridgeStatus">
                         <div class="status-card">
                             <h3>Node.js Bridge Status</h3>
                             <div class="status-indicator" id="bridgeIndicator"></div>
                             <span id="bridgeStatusText">Disconnected</span>
                         </div>
+                        <div class="download-section">
+                            <h4>Download Bridge Files</h4>
+                            <p>Download and extract these files to set up the build bridge:</p>
+                            <div class="download-buttons">
+                                <button id="downloadBridge" class="download-button">Download Bridge Package</button>
+                            </div>
+                        </div>
                         <div class="instructions">
                             <h4>To start the bridge:</h4>
-                            <code>node bridge.js</code>
+                            <code>npm install && node bridge.js</code>
                         </div>
                     </div>
 
@@ -119,14 +113,8 @@
         </main>
     </div>
 
-    <script type="importmap">
-    {
-      "imports": {
-        "jszip": "https://esm.sh/jszip@3.10.1"
-      }
-    }
-    </script>
     <script type="module" src="app.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"4c6229722a6346bc8eb5cb0e5eae5d41","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 </body>
 </html>

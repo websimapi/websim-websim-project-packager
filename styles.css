@@ -402,6 +402,48 @@ code {
     color: #6b7280;
 }
 
+.download-section {
+    background: #f0f9ff;
+    padding: 1rem;
+    border-radius: 6px;
+    border-left: 3px solid #0ea5e9;
+    margin-bottom: 1rem;
+}
+
+.download-section h4 {
+    margin-bottom: 0.5rem;
+    font-size: 0.9rem;
+    color: #0369a1;
+}
+
+.download-section p {
+    font-size: 0.85rem;
+    color: #475569;
+    margin-bottom: 1rem;
+}
+
+.download-buttons {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.download-button {
+    background: #0ea5e9;
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.download-button:hover {
+    background: #0284c7;
+    transform: translateY(-1px);
+}
+
 @media (max-width: 768px) {
     .header-content {
         padding: 0 1rem;
@@ -423,4 +465,3 @@ code {
         grid-template-columns: 1fr;
     }
 }
-
