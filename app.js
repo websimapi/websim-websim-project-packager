@@ -67,6 +67,10 @@ class ProjectPackager {
             this.requestBuild();
         });
 
+        document.getElementById('downloadBridgeButton')?.addEventListener('click', () => {
+            this.downloadBridge();
+        });
+
         // Project selection
         document.addEventListener('click', (e) => {
             const projectCard = e.target.closest('.project-card');
@@ -455,10 +459,277 @@ class ProjectPackager {
     handlePresenceUpdateRequest(request, fromClientId) {
         // Handle presence update requests if needed
     }
+
+    downloadBridge() {
+        // Create the bridge files as a downloadable zip
+        const bridgeFiles = {
+            'bridge.js': this.getBridgeFileContent(),
+            'package.json': this.getPackageJsonContent(),
+            'README.md': this.getReadmeContent()
+        };
+
+        this.createAndDownloadZip(bridgeFiles, 'websim-bridge.zip');
+    }
+
+    getBridgeFileContent() {
+        return `const WebSocket = require('ws');
+const { exec } = require('child_process');
+const fs = require('fs');
+const path = require('path');
+const archiver = require('archiver');
+
+class BuildBridge {
+    constructor() {
+        this.server = new WebSocket.Server({ port: 8080 });
+        this.setupServer();
+        console.log('Build bridge listening on ws://localhost:8080');
+    }
+
+    setupServer() {
+        this.server.on('connection', (ws) => {
+            console.log('WebSim client connected');
+
+            ws.on('message', (message) => {
+                try {
+                    const data = JSON.parse(message);
+                    this.handleMessage(ws, data);
+                } catch (error) {
+                    console.error('Invalid message:', error);
+                }
+            });
+
+            ws.on('close', () => {
+                console.log('WebSim client disconnected');
+            });
+        });
+    }
+
+    async handleMessage(ws, data) {
+        switch (data.type) {
+            case 'build':
+                await this.handleBuild(ws, data);
+                break;
+        }
+    }
+
+    async handleBuild(ws, { url, platform, projectName, requestId }) {
+        const outputDir = path.join(__dirname, 'builds', requestId);
+        const zipPath = path.join(__dirname, 'builds', \`\${projectName}-\${platform}.zip\`);
+
+        try {
+            if (!fs.existsSync(path.join(__dirname, 'builds'))) {
+                fs.mkdirSync(path.join(__dirname, 'builds'));
+            }
+
+            this.sendProgress(ws, requestId, 'Preparing build environment...', 30);
+
+            const arch = platform === 'darwin' ? 'x64' : 'x64';
+            const command = \`npx nativefier "\${url}" --name "\${projectName}" --platform "\${platform}" --arch "\${arch}" --out "\${outputDir}" --overwrite\`;
+
+            console.log('Running command:', command);
+            
+            this.sendProgress(ws, requestId, 'Building application...', 60);
+
+            exec(command, { timeout: 300000 }, async (error, stdout, stderr) => {
+                if (error) {
+                    console.error('Build error:', error);
+                    this.sendError(ws, requestId, \`Build failed: \${error.message}\`);
+                    return;
+                }
+
+                try {
+                    this.sendProgress(ws, requestId, 'Compressing application...', 80);
+
+                    const builtAppDir = this.findBuiltApp(outputDir, projectName);
+                    if (!builtAppDir) {
+                        throw new Error('Built application not found');
+                    }
+
+                    await this.createZip(builtAppDir, zipPath);
+                    this.sendProgress(ws, requestId, 'Upload complete!', 100);
+
+                    const downloadUrl = await this.uploadFile(zipPath);
+                    this.sendComplete(ws, requestId, downloadUrl);
+                    this.cleanup(outputDir, zipPath);
+
+                } catch (zipError) {
+                    console.error('Compression error:', zipError);
+                    this.sendError(ws, requestId, \`Compression failed: \${zipError.message}\`);
+                }
+            });
+
+        } catch (error) {
+            console.error('Build setup error:', error);
+            this.sendError(ws, requestId, \`Build setup failed: \${error.message}\`);
+        }
+    }
+
+    findBuiltApp(outputDir, projectName) {
+        try {
+            const files = fs.readdirSync(outputDir);
+            for (const file of files) {
+                const filePath = path.join(outputDir, file);
+                if (fs.statSync(filePath).isDirectory()) {
+                    return filePath;
+                }
+            }
+        } catch (error) {
+            console.error('Error finding built app:', error);
+        }
+        return null;
+    }
+
+    createZip(sourceDir, outputPath) {
+        return new Promise((resolve, reject) => {
+            const output = fs.createWriteStream(outputPath);
+            const archive = archiver('zip', { zlib: { level: 9 } });
+
+            output.on('close', () => {
+                console.log(\`ZIP created: \${archive.pointer()} total bytes\`);
+                resolve();
+            });
+
+            archive.on('error', (err) => {
+                reject(err);
+            });
+
+            archive.pipe(output);
+            archive.directory(sourceDir, false);
+            archive.finalize();
+        });
+    }
+
+    async uploadFile(filePath) {
+        try {
+            const fileBuffer = fs.readFileSync(filePath);
+            const file = new File([fileBuffer], path.basename(filePath), { type: 'application/zip' });
+            return \`http://localhost:8080/download/\${path.basename(filePath)}\`;
+        } catch (error) {
+            throw new Error(\`Upload failed: \${error.message}\`);
+        }
+    }
+
+    cleanup(outputDir, zipPath) {
+        try {
+            if (fs.existsSync(outputDir)) {
+                fs.rmSync(outputDir, { recursive: true, force: true });
+            }
+            
+            setTimeout(() => {
+                if (fs.existsSync(zipPath)) {
+                    fs.unlinkSync(zipPath);
+                }
+            }, 3600000);
+        } catch (error) {
+            console.error('Cleanup error:', error);
+        }
+    }
+
+    sendProgress(ws, requestId, message, progress) {
+        ws.send(JSON.stringify({
+            type: 'build_progress',
+            requestId,
+            message,
+            progress
+        }));
+    }
+
+    sendComplete(ws, requestId, downloadUrl) {
+        ws.send(JSON.stringify({
+            type: 'build_complete',
+            requestId,
+            downloadUrl
+        }));
+    }
+
+    sendError(ws, requestId, error) {
+        ws.send(JSON.stringify({
+            type: 'build_error',
+            requestId,
+            error
+        }));
+    }
+
+    getPackageJsonContent() {
+        return `{
+  "name": "websim-build-bridge",
+  "version": "1.0.0",
+  "description": "Node.js bridge for building WebSim projects",
+  "main": "bridge.js",
+  "scripts": {
+    "start": "node bridge.js"
+  },
+  "dependencies": {
+    "ws": "^8.13.0",
+    "archiver": "^5.3.1"
+  },
+  "devDependencies": {
+    "nativefier": "^50.0.0"
+  }
+}`;
+    }
+
+    getReadmeContent() {
+        return `# WebSim Build Bridge
+
+This bridge enables packaging WebSim projects as desktop applications.
+
+## Setup
+
+1. Install Node.js (https://nodejs.org)
+2. Extract this ZIP file to a folder
+3. Open terminal/command prompt in that folder
+4. Run: \`npm install\`
+5. Run: \`npm start\`
+
+## Usage
+
+Once running, the bridge will:
+- Listen on ws://localhost:8080
+- Accept build requests from WebSim
+- Package projects using Nativefier
+- Return downloadable applications
+
+## Requirements
+
+- Node.js 16+
+- Internet connection for downloading dependencies
+- Sufficient disk space for temporary builds
+
+## Troubleshooting
+
+- Ensure port 8080 is available
+- Check firewall settings
+- Make sure you have write permissions in the bridge folder
+`;
+    }
+
+    createAndDownloadZip(files, filename) {
+        // Use JSZip to create zip in browser
+        import('https://esm.sh/jszip').then(({ default: JSZip }) => {
+            const zip = new JSZip();
+            
+            // Add each file to the zip
+            Object.entries(files).forEach(([filename, content]) => {
+                zip.file(filename, content);
+            });
+            
+            // Generate and download
+            zip.generateAsync({ type: 'blob' }).then((blob) => {
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            });
+        });
+    }
 }
 
 // Initialize the app when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
     new ProjectPackager();
 });
-
